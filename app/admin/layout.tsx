@@ -9,7 +9,6 @@ const navGroups = [
         links: [
             { href: "/admin/humor-flavors", text: "Humor Flavors" },
             { href: "/admin/humor-flavor-steps", text: "Flavor Steps" },
-            { href: "/admin/humor-mix", text: "Humor Mix" },
             { href: "/admin/generate-captions", text: "Test Captions" },
         ],
     },
@@ -18,8 +17,6 @@ const navGroups = [
         links: [
             { href: "/admin/llm-models", text: "LLM Models" },
             { href: "/admin/llm-providers", text: "LLM Providers" },
-            { href: "/admin/llm-prompt-chains", text: "Prompt Chains" },
-            { href: "/admin/llm-responses", text: "LLM Responses" },
         ],
     },
 ];
@@ -45,7 +42,11 @@ export default async function AdminLayout({
                                 <div className="nav-group-label">{group.label}</div>
 
                                 {group.links.map((link) => (
-                                    <Link key={link.href} href={link.href} className="nav-link">
+                                    <Link
+                                        key={link.href}
+                                        href={link.href}
+                                        className="nav-link"
+                                    >
                                         {link.text}
                                     </Link>
                                 ))}

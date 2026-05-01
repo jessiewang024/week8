@@ -1,24 +1,44 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { createHumorFlavor, updateHumorFlavor, deleteHumorFlavor } from "./actions";
+import {
+    createFlavor,
+    updateFlavor,
+    deleteFlavor,
+    duplicateHumorFlavor,
+} from "./actions";
 
 /**
- * Humor Flavors page — full CRUD.
- * A "humor flavor" defines a style of humor (e.g. sarcasm, puns, dark humor).
- * Each flavor has a set of steps (prompt chain) that generates captions.
+ * Humor Flavors page.
+ * Admin can create, update, delete, and duplicate humor flavors.
+ * Duplicating a flavor also duplicates all related prompt chain steps.
  */
 export default async function HumorFlavorsPage() {
     const admin = createServiceClient();
 
-    const { data: flavors, error } = await admin
-        .from("humor_flavors")
-        .select("*")
-        .limit(100);
+    const [{ data: flavors, error }, { data: steps }] = await Promise.all([
+        admin
+            .from("humor_flavors")
+            .select("*")
+            .order("id", { ascending: false }),
+        admin
+            .from("humor_flavor_steps")
+            .select("id, humor_flavor_id"),
+    ]);
+
+    const stepCounts: Record<string, number> = {};
+
+    for (const step of steps ?? []) {
+        const flavorId = String(step.humor_flavor_id);
+        stepCounts[flavorId] = (stepCounts[flavorId] ?? 0) + 1;
+    }
 
     return (
         <div>
-            <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>Humor Flavors</h1>
+            <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>
+                Humor Flavors
+            </h1>
+
             <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
-                Manage humor flavor configurations.
+                Create, edit, delete, and duplicate humor flavors. Duplicating a flavor also copies all of its steps.
             </p>
 
             {error && (
@@ -27,77 +47,195 @@ export default async function HumorFlavorsPage() {
                 </p>
             )}
 
-            {/* ── Create Form ────────────────────────────────── */}
             <section style={cardStyle}>
                 <h2 style={{ marginBottom: "16px" }}>Create Humor Flavor</h2>
-                <form action={createHumorFlavor} style={{ display: "grid", gap: "12px", maxWidth: "600px" }}>
-                    <label style={labelStyle}>Slug</label>
-                    <input name="slug" placeholder="e.g. sarcastic-wit" style={inputStyle} required />
+
+                <form
+                    action={createFlavor}
+                    style={{
+                        display: "grid",
+                        gap: "12px",
+                        maxWidth: "600px",
+                    }}
+                >
+                    <label style={labelStyle}>Flavor Name</label>
+                    <input
+                        name="slug"
+                        placeholder="e.g., dry-humor-like-the-office"
+                        style={inputStyle}
+                        required
+                    />
 
                     <label style={labelStyle}>Description</label>
-                    <textarea name="description" style={textareaStyle} />
+                    <textarea
+                        name="description"
+                        placeholder="Describe what this humor flavor is supposed to do..."
+                        style={textareaStyle}
+                        rows={3}
+                    />
 
-                    <button type="submit" style={buttonStyle}>Create Flavor</button>
+                    <button type="submit" style={buttonStyle}>
+                        Create Flavor
+                    </button>
                 </form>
             </section>
 
-            {/* ── Table ───────────────────────────────────────── */}
-            <table style={tableStyle}>
-                <thead>
+            <section style={cardStyle}>
+                <h2 style={{ marginBottom: "16px" }}>Existing Humor Flavors</h2>
+
+                <table style={tableStyle}>
+                    <thead>
                     <tr>
                         <th style={thStyle}>ID</th>
-                        <th style={thStyle}>Slug</th>
+                        <th style={thStyle}>Flavor Name</th>
                         <th style={thStyle}>Description</th>
+                        <th style={thStyle}>Steps</th>
                         <th style={thStyle}>Created</th>
                         <th style={thStyle}>Actions</th>
                     </tr>
-                </thead>
-                <tbody>
-                    {flavors?.map((f: any) => (
-                        <tr key={f.id}>
-                            <td style={monoTdStyle}>{f.id}</td>
-                            <td style={tdStyle}>{f.slug}</td>
-                            <td style={{ ...tdStyle, maxWidth: "250px" }}>{f.description ?? "—"}</td>
+                    </thead>
+
+                    <tbody>
+                    {flavors?.map((flavor: any) => (
+                        <tr key={flavor.id}>
+                            <td style={monoTdStyle}>{flavor.id}</td>
+
                             <td style={tdStyle}>
-                                {f.created_datetime_utc ? new Date(f.created_datetime_utc).toLocaleDateString() : "—"}
+                                <strong>{flavor.slug}</strong>
                             </td>
+
+                            <td style={{ ...tdStyle, maxWidth: "320px" }}>
+                                {flavor.description ?? "—"}
+                            </td>
+
                             <td style={tdStyle}>
-                                {/* Edit form inside collapsible details */}
+                                {stepCounts[String(flavor.id)] ?? 0}
+                            </td>
+
+                            <td style={tdStyle}>
+                                {flavor.created_datetime_utc
+                                    ? new Date(flavor.created_datetime_utc).toLocaleDateString()
+                                    : "—"}
+                            </td>
+
+                            <td style={tdStyle}>
                                 <details>
-                                    <summary style={{ cursor: "pointer", color: "var(--accent)" }}>Edit</summary>
-                                    <form action={updateHumorFlavor} style={{ display: "grid", gap: "8px", marginTop: "8px", minWidth: "250px" }}>
-                                        <input type="hidden" name="id" value={f.id} />
-                                        <input name="slug" defaultValue={f.slug ?? ""} style={inputStyle} />
-                                        <textarea name="description" defaultValue={f.description ?? ""} style={textareaStyle} />
-                                        <button type="submit" style={buttonStyle}>Update</button>
+                                    <summary style={summaryStyle}>
+                                        Edit
+                                    </summary>
+
+                                    <form
+                                        action={updateFlavor}
+                                        style={{
+                                            display: "grid",
+                                            gap: "8px",
+                                            marginTop: "8px",
+                                            minWidth: "280px",
+                                        }}
+                                    >
+                                        <input
+                                            type="hidden"
+                                            name="id"
+                                            value={flavor.id}
+                                        />
+
+                                        <label style={labelStyle}>Flavor Name</label>
+                                        <input
+                                            name="slug"
+                                            defaultValue={flavor.slug ?? ""}
+                                            style={inputStyle}
+                                            required
+                                        />
+
+                                        <label style={labelStyle}>Description</label>
+                                        <textarea
+                                            name="description"
+                                            defaultValue={flavor.description ?? ""}
+                                            style={textareaStyle}
+                                            rows={3}
+                                        />
+
+                                        <button type="submit" style={buttonStyle}>
+                                            Update Flavor
+                                        </button>
                                     </form>
                                 </details>
 
-                                {/* Delete button */}
-                                <form action={deleteHumorFlavor} style={{ marginTop: "8px" }}>
-                                    <input type="hidden" name="id" value={f.id} />
-                                    <button type="submit" style={dangerButtonStyle}>Delete</button>
+                                <details style={{ marginTop: "8px" }}>
+                                    <summary style={summaryStyle}>
+                                        Duplicate
+                                    </summary>
+
+                                    <form
+                                        action={duplicateHumorFlavor}
+                                        style={{
+                                            display: "grid",
+                                            gap: "8px",
+                                            marginTop: "8px",
+                                            minWidth: "280px",
+                                        }}
+                                    >
+                                        <input
+                                            type="hidden"
+                                            name="id"
+                                            value={flavor.id}
+                                        />
+
+                                        <label style={labelStyle}>
+                                            New Unique Flavor Name
+                                        </label>
+
+                                        <input
+                                            name="new_slug"
+                                            placeholder={`${flavor.slug}-copy`}
+                                            style={inputStyle}
+                                            required
+                                        />
+
+                                        <button type="submit" style={buttonStyle}>
+                                            Duplicate Flavor
+                                        </button>
+                                    </form>
+                                </details>
+
+                                <form
+                                    action={deleteFlavor}
+                                    style={{ marginTop: "8px" }}
+                                >
+                                    <input
+                                        type="hidden"
+                                        name="id"
+                                        value={flavor.id}
+                                    />
+
+                                    <button type="submit" style={dangerButtonStyle}>
+                                        Delete
+                                    </button>
                                 </form>
                             </td>
                         </tr>
                     ))}
+
                     {(!flavors || flavors.length === 0) && !error && (
-                        <tr><td style={tdStyle} colSpan={5}>No humor flavors found.</td></tr>
+                        <tr>
+                            <td style={tdStyle} colSpan={6}>
+                                No humor flavors found.
+                            </td>
+                        </tr>
                     )}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </section>
         </div>
     );
 }
-
-// ── Style constants ─────────────────────────────────────────
 
 const cardStyle: React.CSSProperties = {
     border: "1px solid var(--card-border)",
     borderRadius: "12px",
     padding: "20px",
     backgroundColor: "var(--card-bg)",
-    marginBottom: "24px",
+    marginBottom: "20px",
 };
 
 const tableStyle: React.CSSProperties = {
@@ -152,7 +290,7 @@ const inputStyle: React.CSSProperties = {
 
 const textareaStyle: React.CSSProperties = {
     ...inputStyle,
-    minHeight: "60px",
+    minHeight: "70px",
     resize: "vertical",
 };
 
@@ -169,4 +307,10 @@ const buttonStyle: React.CSSProperties = {
 const dangerButtonStyle: React.CSSProperties = {
     ...buttonStyle,
     backgroundColor: "var(--danger)",
+};
+
+const summaryStyle: React.CSSProperties = {
+    cursor: "pointer",
+    color: "var(--accent)",
+    fontWeight: 500,
 };

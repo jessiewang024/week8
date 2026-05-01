@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 /**
  * LLM Responses page — READ only.
  * Shows the raw responses from LLM API calls.
- * Useful for debugging what the AI actually returned.
  */
 export default async function LlmResponsesPage() {
     const admin = createServiceClient();
@@ -11,13 +10,17 @@ export default async function LlmResponsesPage() {
     const { data: responses, error } = await admin
         .from("llm_model_responses")
         .select("*")
-        .limit(100);
+        .order("created_datetime_utc", { ascending: false });
 
     return (
         <div>
-            <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>LLM Responses</h1>
+            <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>
+                LLM Responses
+            </h1>
+
             <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
-                Read-only log of LLM API responses. Showing {responses?.length ?? 0} rows.
+                Read-only log of all LLM API responses. Showing{" "}
+                {responses?.length ?? 0} rows.
             </p>
 
             {error && (
@@ -28,42 +31,48 @@ export default async function LlmResponsesPage() {
 
             <table style={tableStyle}>
                 <thead>
-                    <tr>
-                        <th style={thStyle}>ID</th>
-                        <th style={thStyle}>Model</th>
-                        <th style={thStyle}>Prompt Chain ID</th>
-                        <th style={thStyle}>Response</th>
-                        <th style={thStyle}>Processing (s)</th>
-                        <th style={thStyle}>Created</th>
-                    </tr>
+                <tr>
+                    <th style={thStyle}>ID</th>
+                    <th style={thStyle}>Model</th>
+                    <th style={thStyle}>Prompt Chain ID</th>
+                    <th style={thStyle}>Response</th>
+                    <th style={thStyle}>Processing (s)</th>
+                    <th style={thStyle}>Created</th>
+                </tr>
                 </thead>
+
                 <tbody>
-                    {responses?.map((r: any) => (
-                        <tr key={r.id}>
-                            <td style={monoTdStyle}>{r.id}</td>
-                            <td style={tdStyle}>{r.llm_model_id ?? r.model ?? "—"}</td>
-                            <td style={monoTdStyle}>{r.llm_prompt_chain_id ?? "—"}</td>
-                            <td style={{ ...tdStyle, maxWidth: "300px" }}>
-                                {r.llm_model_response ?? "—"}
-                            </td>
-                            <td style={tdStyle}>{r.processing_time_seconds ?? "—"}</td>
-                            <td style={tdStyle}>
-                                {r.created_datetime_utc ? new Date(r.created_datetime_utc).toLocaleDateString() : "—"}
-                            </td>
-                        </tr>
-                    ))}
-                    {(!responses || responses.length === 0) && !error && (
-                        <tr>
-                            <td style={tdStyle} colSpan={6}>No LLM responses found.</td>
-                        </tr>
-                    )}
+                {responses?.map((r: any) => (
+                    <tr key={r.id}>
+                        <td style={monoTdStyle}>{r.id}</td>
+                        <td style={tdStyle}>{r.llm_model_id ?? r.model ?? "—"}</td>
+                        <td style={monoTdStyle}>{r.llm_prompt_chain_id ?? "—"}</td>
+                        <td style={{ ...tdStyle, maxWidth: "420px", whiteSpace: "pre-wrap" }}>
+                            {r.llm_model_response ?? r.response ?? "—"}
+                        </td>
+                        <td style={tdStyle}>
+                            {r.processing_time_seconds ?? "—"}
+                        </td>
+                        <td style={tdStyle}>
+                            {r.created_datetime_utc
+                                ? new Date(r.created_datetime_utc).toLocaleDateString()
+                                : "—"}
+                        </td>
+                    </tr>
+                ))}
+
+                {(!responses || responses.length === 0) && !error && (
+                    <tr>
+                        <td style={tdStyle} colSpan={6}>
+                            No LLM responses found.
+                        </td>
+                    </tr>
+                )}
                 </tbody>
             </table>
         </div>
     );
 }
-
-// ── Style constants ─────────────────────────────────────────
 
 const tableStyle: React.CSSProperties = {
     width: "100%",
@@ -90,6 +99,7 @@ const tdStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "13px",
+    verticalAlign: "top",
 };
 
 const monoTdStyle: React.CSSProperties = {
